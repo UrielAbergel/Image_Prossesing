@@ -121,8 +121,8 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
     # ============ calculate the cumsum
     cumsum = np.cumsum(histOrg)
     # ============   create lookuptable
-    cumsum = cumsum/np.max(cumsum)
-    lookUpTable = cumsum*255
+    cumsum = cumsum / np.max(cumsum)
+    lookUpTable = cumsum * 255
     lookUpTable = lookUpTable.astype('uint8')
     # enter all parameter to the look up table
     imEq = lookUpTable[image.ravel()]
@@ -132,11 +132,9 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
     else:
         histEQ, new_bins = np.histogram(imEq.ravel(), 256)
         newImage = transformRGB2YIQ(imgOrig)
-        newImage[:, :, 0] = imEq.reshape(n, m)
+        newImage[:, :, 0] = imEq.reshape(n, m) / 255
         newImage = transformYIQ2RGB(newImage)
         return newImage, histOrg, histEQ
-
-
 
 
 def checkIfColor(img: np.ndarray) -> bool:
@@ -153,7 +151,6 @@ def goodValue(img: np.ndarray, row, cols):
     return img[row][cols] < 255
 
 
-
 def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarray], List[float]):
     """
         Quantized an image in to **nQuant** colors
@@ -162,9 +159,58 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
         :param nIter: Number of optimization loops
         :return: (List[qImage_i],List[error_i])
     """
+    zArray = []
+    qArray = []
+    errArray = []
+    picsArray = []
+
+    color = checkIfColor(imOrig)
+    # convert to YIQ to take the Y
+    if color:
+        # ============ take the Y array to perform
+        image = transformRGB2YIQ(imOrig)[:, :, 0]
+    else:
+        image = imOrig.copy()
+
+    image = cv.normalize(image, None, 0, 255, cv.NORM_MINMAX)
+    hist, bins = np.histogram(image, 256)
+    border = int(256 / nQuant)
+    for i in range(nQuant + 1):
+        zArray.append(i * border)
+    for i in range(nIter):
+        qArray = findMyQarray(nQuant, hist, zArray)
+        errArray.append(returnMyError())
 
 
-    pass
+
+
+def findMyQarray(nQuant: int, hist: np.ndarray, zArray: np.ndarray) -> np.ndarray:
+    cumsum = cumsum = np.cumsum(hist)
+    zArrayQtoReturn = []
+    sumOfall = 0
+    numbers = 0
+
+    for i in range(nQuant):
+        getStart = zArray[i]
+        getEnd = zArray[i+1]
+        for j in range(getStart, getEnd):
+            sumOfall = sumOfall + hist[j] * j
+            numbers = numbers + hist[j]
+        zArrayQtoReturn.append(sumOfall/numbers)
+        sumOfall = 0
+        numbers = 0
+
+    return zArrayQtoReturn
+
+def returnMyError() -> np.ndarray:
+    print("hello")
+
+
+def sumArrayFromAtoB(hist: np.ndarray,a : int, b: int) -> int:
+    sum = 0
+    for i in range(b-a):
+        sum = sum + hist[i]
+    return sum
 
 
 if __name__ == '__main__':
