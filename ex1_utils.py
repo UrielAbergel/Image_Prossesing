@@ -99,22 +99,59 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
         :param imgOrig: Original Histogram
         :ret
     """
-    dimOfMath = imgOrig.ndim
+    # ============ check if the color is RGB or Gray
+    color = checkIfColor(imgOrig)
+    if color:
+        n, m, k = imgOrig.shape
+    else:
+        n, m = imgOrig.shape
 
+    # convert to YIQ to take the Y
+    if color:
+        # ============ take the Y array to perform
+        image = transformRGB2YIQ(imgOrig)[:, :, 0]
+    else:
+        image = imgOrig.copy()
+
+    image = cv.normalize(image, None, 0, 255, cv.NORM_MINMAX)
+    image = image.astype('uint8')
+
+    # ============ make histogram
+    histOrg, old_bins = np.histogram(image.ravel(), 256)
+    # ============ calculate the cumsum
+    cumsum = np.cumsum(histOrg)
+    # ============   create lookuptable
+    cumsum = cumsum/np.max(cumsum)
+    lookUpTable = cumsum*255
+    lookUpTable = lookUpTable.astype('uint8')
+    # enter all parameter to the look up table
+    imEq = lookUpTable[image.ravel()]
+    if not color:
+        histEQ, new_bins = np.histogram(imEq.ravel(), 256)
+        return imEq.reshape(n, m), histOrg, histEQ
+    else:
+        histEQ, new_bins = np.histogram(imEq.ravel(), 256)
+        newImage = transformRGB2YIQ(imgOrig)
+        newImage[:, :, 0] = imEq.reshape(n, m)
+        newImage = transformYIQ2RGB(newImage)
+        return newImage, histOrg, histEQ
+
+
+
+
+def checkIfColor(img: np.ndarray) -> bool:
+    dimOfMath = img.ndim
     # check if is gray scale of rgb
     if dimOfMath == 3:
         imgIsColor = True
     else:
         imgIsColor = False
-
-    # make histogram
-    hist, bins = np.histogram(imgOrig.ravel(), 255)
-    cumsum = np.cumsum(hist)
-    plt.imshow(hist, hist.shape())
-    plt.show()
+    return imgIsColor
 
 
-    pass
+def goodValue(img: np.ndarray, row, cols):
+    return img[row][cols] < 255
+
 
 
 def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarray], List[float]):
@@ -125,6 +162,8 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
         :param nIter: Number of optimization loops
         :return: (List[qImage_i],List[error_i])
     """
+
+
     pass
 
 
