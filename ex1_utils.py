@@ -109,7 +109,7 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
     # convert to YIQ to take the Y
     if color:
         # ============ take the Y array to perform
-        image = transformRGB2YIQ(imgOrig)[:, :, 0]
+        image = transformRGB2YIQ(imgOrig.copy())[:, :, 0]
     else:
         image = imgOrig.copy()
 
@@ -131,7 +131,7 @@ def hsitogramEqualize(imgOrig: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarra
         return imEq.reshape(n, m), histOrg, histEQ
     else:
         histEQ, new_bins = np.histogram(imEq.ravel(), 256)
-        newImage = transformRGB2YIQ(imgOrig)
+        newImage = transformRGB2YIQ(imgOrig.copy())
         newImage[:, :, 0] = imEq.reshape(n, m) / 255
         newImage = transformYIQ2RGB(newImage)
         return newImage, histOrg, histEQ
@@ -148,6 +148,13 @@ def checkIfColor(img: np.ndarray) -> bool:
 
 
 def goodValue(img: np.ndarray, row, cols):
+    """
+
+    :param img: check at the image
+    :param row: in row
+    :param cols: in cols
+    :return:
+    """
     return img[row][cols] < 255
 
 
@@ -178,39 +185,94 @@ def quantizeImage(imOrig: np.ndarray, nQuant: int, nIter: int) -> (List[np.ndarr
     for i in range(nQuant + 1):
         zArray.append(i * border)
     for i in range(nIter):
+        # build q z and check the error and pics
         qArray = findMyQarray(nQuant, hist, zArray)
-        errArray.append(returnMyError())
-
-
+        error, get_new_image = returnMyError(image, imOrig, qArray, zArray)
+        errArray.append(error)
+        picsArray.append(get_new_image)
+        zArray = newZarray(qArray, nQuant)
+    return picsArray, errArray
 
 
 def findMyQarray(nQuant: int, hist: np.ndarray, zArray: np.ndarray) -> np.ndarray:
-    cumsum = cumsum = np.cumsum(hist)
+    """
+
+    :param nQuant: how much borads
+    :param hist: the histograme from the picture
+    :param zArray: the border array
+    :return: the new color array
+    """
     zArrayQtoReturn = []
     sumOfall = 0
     numbers = 0
 
     for i in range(nQuant):
-        getStart = zArray[i]
-        getEnd = zArray[i+1]
+        getStart = int(zArray[i])
+        getEnd = int(zArray[i + 1])
         for j in range(getStart, getEnd):
             sumOfall = sumOfall + hist[j] * j
             numbers = numbers + hist[j]
-        zArrayQtoReturn.append(sumOfall/numbers)
+        zArrayQtoReturn.append(sumOfall / numbers)
         sumOfall = 0
         numbers = 0
 
     return zArrayQtoReturn
 
-def returnMyError() -> np.ndarray:
-    print("hello")
+
+def newZarray(qArray: np.ndarray, nQuant: int) -> np.ndarray:
+    """
+
+    :param qArray: the colors array
+    :param nQuant: the borders len
+    :return: the new border array
+    """
+    zToReturn = []
+    for i in range(nQuant):
+        if i == 0:
+            zToReturn.append(0)
+        else:
+            zToReturn.append(getValueToCheckZ(qArray[i - 1], qArray[i]))
+    zToReturn.append(255)
+    return zToReturn
 
 
-def sumArrayFromAtoB(hist: np.ndarray,a : int, b: int) -> int:
-    sum = 0
-    for i in range(b-a):
-        sum = sum + hist[i]
-    return sum
+def getValueToCheckZ(a: int, b: int):
+    """
+
+    :param a: number
+    :param b: number
+    :return: calculate for z array
+    """
+    return (a + b) / 2
+
+
+def returnMyError(image: np.ndarray, imgOrig: np.ndarray, qArray: np.ndarray, zArray: np.ndarray) -> (
+np.ndarray, np.ndarray):
+    """
+
+    :param image: image color of gray
+    :param imgOrig: the original image
+    :param qArray: the color array that i calculate
+    :param zArray: the border array that i calculate
+    :return:
+    """
+    new_image = image.copy()
+    color = checkIfColor(imgOrig.copy())
+
+    for i in range(len(qArray)):
+        boolMatrix = np.logical_and(zArray[i] <= new_image, new_image <= zArray[i + 1])
+        new_image[boolMatrix] = int(qArray[i])
+    new_image = new_image / 255
+    error = np.sqrt(np.sum(np.power((image / 255) - new_image, 2)) / (image.shape[0] * image.shape[1]))
+    if color:
+        # ============ take the Y array to perform
+        image_to_return = transformRGB2YIQ(imgOrig.copy())
+        image_to_return[:, :, 0] = new_image
+        image_to_return = transformYIQ2RGB(image_to_return)
+    else:
+        image_to_return = new_image
+
+    return error, image_to_return
 
 
 if __name__ == '__main__':
